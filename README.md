@@ -357,12 +357,29 @@ All three collide with the same constraint: Android's kernel gives 39 bits of ad
 
 ---
 
+## Credits
+
+This project stands on other people's work.
+
+**[Zomdroid](https://github.com/udarmolota/zomdroid)** — by [udarmolota](https://github.com/udarmolota), forked from [liamelui/zomdroid](https://github.com/liamelui/zomdroid) (archived). Two things here come directly from it:
+
+- **The ARM LWJGL build.** `liblwjgl.so` and `liblwjgl_opengl.so` are extracted from the Zomdroid APK (`assets/bundles/libs.tar.xz`). They compiled LWJGL against bionic for Android; without that, the server can't get past its gamepad init. Nothing in this repo rebuilds them — it just unpacks theirs.
+- **Knowing the natives existed at all.** A Zomdroid release note pointed at `natives/android/arm64-v8a/` inside the game files. That's the whole basis of this approach.
+
+**[The Indie Stone](https://projectzomboid.com/)** — for shipping ARM64 builds of the engine's native libraries in the game depot in the first place, presumably for their own Android work.
+
+**[DepotDownloader](https://github.com/SteamRE/DepotDownloader)** (SteamRE) — the only practical way to pull Steam depots on a platform where SteamCMD refuses to run.
+
+**[playit.gg](https://playit.gg)** — the tunnel used in the CGNAT instructions.
+
+---
+
 ## Related projects
 
-- [Zomdroid](https://github.com/udarmolota/zomdroid) — Project Zomboid client on Android. Source of the ARM LWJGL build used here, and where the `android/` natives folder first came to light. Fork of [liamelui/zomdroid](https://github.com/liamelui/zomdroid), which is archived.
-- [kaanzapkinus/ZomboidServer-arm](https://github.com/kaanzapkinus/ZomboidServer-arm) — box64 setup with a full control panel, mod management and auto-updates
-- [Dyarven/zomboid-server-on-arm](https://github.com/Dyarven/zomboid-server-on-arm) — ARM installer script
-- [Steam thread on ARM64 server binaries](https://steamcommunity.com/app/108600/discussions/1/3415433168012191380/) — years of community attempts
+- [kaanzapkinus/ZomboidServer-arm](https://github.com/kaanzapkinus/ZomboidServer-arm) — box64 setup with a control panel, mod management and auto-updates. Their documented box64 workarounds (`BOX64_DYNAREC_STRONGMEM=3`, `UseSerialGC`) match what the emulation testing here ran into independently.
+- [Dyarven/zomboid-server-on-arm](https://github.com/Dyarven/zomboid-server-on-arm) — ARM installer script using box86/box64
+- [etheth888/project-zomboid-arm64](https://hub.docker.com/r/etheth888/project-zomboid-arm64) — Docker image, also emulated
+- [Steam thread on ARM64 server binaries](https://steamcommunity.com/app/108600/discussions/1/3415433168012191380/) — years of community attempts at this
 
 ---
 
