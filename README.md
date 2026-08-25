@@ -28,11 +28,6 @@ libjassimp64.so         libLighting64.so        libfmodintegration64.so
 
 Combine those with a **native ARM64 JVM** and the game's own `projectzomboid.jar` (architecture-independent Java bytecode), and the server runs natively. The emulation layer disappears entirely.
 
-### Why nobody noticed
-
-The `android/` folder lives in the **game** depot (app `108600`), not the **dedicated server** depot (app `380870`). Everyone troubleshooting ARM servers downloads only the server, so they never see it.
-
----
 
 ## Benchmarks
 
