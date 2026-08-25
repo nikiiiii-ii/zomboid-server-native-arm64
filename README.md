@@ -59,30 +59,49 @@ No root. No proot. No Docker.
 
 ## Quick start
 
-**0. Set up SSH.** Skip this if you already have it, or if you don't mind typing on the phone.
+Five steps. Everything runs in Termux on the phone.
 
-Everything below is easier from a computer. In Termux:
+### Step 0. SSH access
+
+*Skip this if you already have it, or if you don't mind typing on the phone.*
+
+Everything below is far easier from a computer. In Termux:
 
 ```bash
 pkg install openssh -y
-passwd          # set a password
-whoami          # note the username, e.g. u0_a309
-sshd            # start the server, listens on port 8022
 ```
 
-Get the phone's LAN IP from Android settings (Wi-Fi → your network), then from your computer:
+```bash
+passwd
+```
+
+Set a password, then get your username and start the server:
+
+```bash
+whoami
+```
+
+```bash
+sshd
+```
+
+`sshd` listens on port **8022**, not 22, because Termux can't bind privileged ports without root.
+
+Get the phone's LAN IP from Android settings (Wi-Fi, then your network). From your computer:
 
 ```bash
 ssh -p 8022 u0_a309@192.168.1.x
 ```
 
-Port 8022, not 22, because Termux can't bind privileged ports without root.
+Replace the username and IP with yours.
 
-`sshd` doesn't survive a reboot on its own. To start it automatically, install the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) addon from the same source as Termux, then create a startup script:
+<details>
+<summary><b>Optional: start sshd automatically after a reboot</b></summary>
+
+Install the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) addon from the same source as Termux, then:
 
 ```bash
-mkdir -p ~/.termux/boot
-nano ~/.termux/boot/start-sshd
+mkdir -p ~/.termux/boot && nano ~/.termux/boot/start-sshd
 ```
 
 Put this in the file:
@@ -93,13 +112,15 @@ termux-wake-lock
 sshd
 ```
 
-Save with `Ctrl+O`, `Enter`, then `Ctrl+X`. Make it executable:
+Save with `Ctrl+O`, `Enter`, then `Ctrl+X`, and make it executable:
 
 ```bash
 chmod +x ~/.termux/boot/start-sshd
 ```
 
-**1. Install.** Inside Termux:
+</details>
+
+### Step 1. Install
 
 ```bash
 pkg install git -y && git clone https://github.com/nikiiiii-ii/zomboid-server-native-arm64 && cd zomboid-server-native-arm64 && bash install.sh
@@ -113,9 +134,11 @@ curl -Lo install.sh https://raw.githubusercontent.com/nikiiiii-ii/zomboid-server
 
 The script asks for your Steam username early on, only to fetch the ~95 MB `android/` folder, and Steam Guard will prompt on your phone. Everything after that is unattended, including the ~7 GB server download.
 
-Run it in Termux itself, **not** inside proot, because the native libraries are bionic, and proot distros are glibc.
+> **Run this in Termux itself, not inside proot.** The native libraries are bionic, and proot distros are glibc.
 
-**2. First run**, in the foreground, so you can set the admin password:
+### Step 2. First run
+
+Run it in the foreground so you can set the admin password:
 
 ```bash
 ~/start-pz.sh
@@ -123,24 +146,23 @@ Run it in Termux itself, **not** inside proot, because the native libraries are 
 
 Wait for `*** SERVER STARTED ****`, then `Ctrl+C` to stop.
 
-**3. Run it detached** so it survives closing your terminal:
+### Step 3. Run it detached
 
 ```bash
-termux-wake-lock
-tmux new -d -s pz ~/start-pz.sh
+termux-wake-lock && tmux new -d -s pz ~/start-pz.sh
 ```
 
-`termux-wake-lock` is not optional. Without it, Android suspends the process when the screen turns off, and the server dies silently.
+> **`termux-wake-lock` is not optional.** Without it, Android suspends the process when the screen turns off and the server dies silently.
 
-**4. Check on it** without attaching:
+At this point you can close your terminal. The server keeps running on the phone.
+
+### Step 4. Check on it
 
 ```bash
 tmux capture-pane -pt pz | tail -20
 ```
 
-At this point you can close your terminal. The server keeps running on the phone.
-
-To stop it: `tmux kill-session -t pz`. To restart: repeat step 3.
+To stop the server: `tmux kill-session -t pz`. To start it again, repeat step 3.
 
 ---
 
