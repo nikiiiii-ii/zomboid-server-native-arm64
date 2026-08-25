@@ -1,6 +1,6 @@
 # zomboid-server-native-arm64
 
-Run a **Project Zomboid Build 42 dedicated server natively on ARM64**  no box64, no FEX, no QEMU.
+Run a **Project Zomboid Build 42 dedicated server natively on ARM64** — no box64, no FEX, no QEMU.
 
 Tested on a **Poco X3 Pro** (Snapdragon 860, 8 GB RAM) running Termux on Android 12, hosting **PZ 42.20.3**.
 
@@ -49,7 +49,7 @@ The emulated run reached `SERVER STARTED` but was unplayable — hundreds of `ch
 ## Requirements
 
 - ARM64 Android device, **6 GB RAM minimum** (8 GB comfortable)
-- 10 GB free storage
+- ~10 GB free storage
 - [Termux](https://f-droid.org/packages/com.termux/) from **F-Droid or GitHub** — the Play Store build is abandoned and broken
 - A Steam account that **owns Project Zomboid** (for the ARM natives; the server files themselves download anonymously)
 
@@ -59,7 +59,7 @@ No root. No proot. No Docker.
 
 ## Quick start
 
-Inside Termux:
+**1. Install.** Inside Termux:
 
 ```bash
 pkg install git -y
@@ -75,9 +75,36 @@ curl -Lo install.sh https://raw.githubusercontent.com/nikiiiii-ii/zomboid-server
 bash install.sh
 ```
 
-The script asks for your Steam username partway through (only to fetch the ~95 MB `android/` folder) and writes a launcher to `~/start-pz.sh` when it finishes.
+The script asks for your Steam username early on — that's only to fetch the ~95 MB `android/` folder, and Steam Guard will prompt on your phone. Everything after that is unattended, including the ~7 GB server download.
 
 Run it in Termux itself, **not** inside proot — the native libraries are bionic, and proot distros are glibc.
+
+**2. First run**, in the foreground, so you can set the admin password:
+
+```bash
+~/start-pz.sh
+```
+
+Wait for `*** SERVER STARTED ****`, then `Ctrl+C` to stop.
+
+**3. Run it detached** so it survives closing your terminal:
+
+```bash
+termux-wake-lock
+tmux new -d -s pz ~/start-pz.sh
+```
+
+`termux-wake-lock` is not optional — without it Android suspends the process when the screen turns off, and the server dies silently.
+
+**4. Check on it** without attaching:
+
+```bash
+tmux capture-pane -pt pz | tail -20
+```
+
+At this point you can close your terminal. The server keeps running on the phone.
+
+To stop it: `tmux kill-session -t pz`. To restart: repeat step 3.
 
 ---
 
@@ -107,23 +134,18 @@ mkdir -p ~/dd && unzip -q dd.zip -d ~/dd
 dotnet ~/dd/DepotDownloader.dll --version
 ```
 
-### 3. Server files (anonymous, ~7 GB)
-
-```bash
-dotnet ~/dd/DepotDownloader.dll -app 380870 -os linux -osarch 64 -dir ~/pzserver
-```
-
-### 4. ARM64 natives (requires Steam login)
+### 3. ARM64 natives (requires Steam login)
 
 ```bash
 echo "regex:.*android.*" > ~/filter.txt
 dotnet ~/dd/DepotDownloader.dll -app 108600 -os linux -osarch 64 \
   -dir ~/pzgame -filelist ~/filter.txt -username YOUR_STEAM_USER
 
-cp -r ~/pzgame/projectzomboid/natives/android/arm64-v8a ~/pzserver/arm64
+mkdir -p ~/pzserver/arm64
+cp ~/pzgame/projectzomboid/natives/android/arm64-v8a/*.so ~/pzserver/arm64/
 ```
 
-### 5. LWJGL for ARM
+### 4. LWJGL for ARM
 
 The server initialises its gamepad subsystem at boot (`GamepadState` → `ControllerState` → `Input`), pulling in LWJGL. The jar only bundles x86_64 natives, so it dies with:
 
@@ -131,7 +153,7 @@ The server initialises its gamepad subsystem at boot (`GamepadState` → `Contro
 UnsatisfiedLinkError: Failed to locate library: liblwjgl.so
 ```
 
-LWJGL's official `natives-linux-arm64` build is glibc and won't load in Termux. The [Zomdroid](https://github.com/udarmolota/zomdroid) APK ships a bionic build of the matching version:
+LWJGL's official `natives-linux-arm64` build is glibc and won't load in Termux. The [Zomdroid](https://github.com/udarmolota/zomdroid) APK ships a bionic build of the matching version — that project's work is what makes this step possible:
 
 ```bash
 cd ~
@@ -142,6 +164,12 @@ cp android-arm64-v8a/lwjgl-3.4.1/*.so ~/pzserver/arm64/
 ```
 
 Match the LWJGL version to your game build — check the `/tmp/lwjgl_root/<version>/` path in a failed run's log.
+
+### 5. Server files (anonymous, ~7 GB)
+
+```bash
+dotnet ~/dd/DepotDownloader.dll -app 380870 -os linux -osarch 64 -dir ~/pzserver
+```
 
 ### 6. Launch
 
@@ -159,23 +187,37 @@ cd ~/pzserver && java \
 
 Note what's absent: no `box64`, no `BOX64_DYNAREC_*` tuning, no `-Xint`, no `LD_PRELOAD`. Plain `java`.
 
-First run prompts for an admin password.
-
 ---
 
-## Running it detached
+## Managing it from a computer
+
+Typing commands on a phone keyboard gets old fast. Termux can run an SSH server:
 
 ```bash
-termux-wake-lock
-tmux new -d -s pz ~/start-pz.sh
+pkg install openssh -y
+passwd          # set a password
+whoami          # note the username, e.g. u0_a309
+sshd            # start the server, listens on port 8022
 ```
 
-Without `termux-wake-lock`, Android suspends the process when the screen turns off.
-
-Check on it without attaching:
+Get the phone's LAN IP from Android settings (Wi-Fi → your network). Then from your computer:
 
 ```bash
-tmux capture-pane -pt pz | tail -20
+ssh -p 8022 u0_a309@192.168.1.x
+```
+
+Port 8022, not 22 — Termux can't bind privileged ports without root.
+
+`sshd` doesn't survive a reboot on its own. The [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) addon can start it automatically; install it from the same source as Termux, then:
+
+```bash
+mkdir -p ~/.termux/boot
+cat > ~/.termux/boot/start-sshd <<'EOF'
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+sshd
+EOF
+chmod +x ~/.termux/boot/start-sshd
 ```
 
 ---
@@ -209,6 +251,8 @@ sed -i 's/Zombies = 4,/Zombies = 2,/' ~/Zomboid/Server/servertest_SandboxVars.lu
 for i in /sys/class/thermal/thermal_zone*/temp; do cat $i 2>/dev/null; done | sort -n | tail -5
 ```
 
+Around 60 °C under load is normal. Keep the phone out of its case and off soft surfaces.
+
 ---
 
 ## Known limitation
@@ -233,7 +277,69 @@ Steam P2P isn't reachable from this setup:
 - Steam's client uses the same `set_robust_list` syscall Android lacks
 - The ARM natives include `libZNetNoSteam64.so` and no Steam variant
 
-For CGNAT connections without router access, a tunnel like [playit.gg](https://playit.gg) works. Its agent is glibc, so run it inside `proot-distro debian` while the server runs natively in Termux.
+### Tunnelling through CGNAT
+
+If your ISP puts you behind CGNAT — no public IP, no port forwarding — a tunnel service works. [playit.gg](https://playit.gg) has a free tier and players don't install anything.
+
+Its agent is a glibc binary, so it won't run in Termux directly (DNS resolution fails). Run it inside a proot distro instead, while the server stays native:
+
+```bash
+pkg install proot-distro -y
+proot-distro install debian
+proot-distro login debian
+```
+
+Then inside Debian:
+
+```bash
+apt update && apt install -y curl
+cd /root
+curl -Lo playit https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-linux-aarch64
+chmod +x playit
+./playit
+```
+
+It prints a claim URL — open it in a browser, sign in, and create a tunnel of type **Project Zomboid** pointing at `127.0.0.1:16261`. You get an address like `something.tun.ply.gg:2914` to hand out.
+
+To keep it running alongside the server:
+
+```bash
+cat > ~/start-playit.sh <<'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+proot-distro login debian -- /root/playit
+EOF
+chmod +x ~/start-playit.sh
+tmux new -d -s playit ~/start-playit.sh
+```
+
+Newer agent versions (1.x) split the daemon from a GUI frontend and can't be claimed from a terminal, which is why this pins 0.15.26.
+
+---
+
+## Updating
+
+When Project Zomboid gets a new build, re-run both downloads:
+
+```bash
+dotnet ~/dd/DepotDownloader.dll -app 380870 -os linux -osarch 64 -dir ~/pzserver
+
+echo "regex:.*android.*" > ~/filter.txt
+dotnet ~/dd/DepotDownloader.dll -app 108600 -os linux -osarch 64 \
+  -dir ~/pzgame -filelist ~/filter.txt -username YOUR_STEAM_USER
+cp ~/pzgame/projectzomboid/natives/android/arm64-v8a/*.so ~/pzserver/arm64/
+```
+
+Things worth checking after an update:
+
+- **Java version.** If the server dies with `UnsupportedClassVersionError`, the game moved to a newer JDK. Check `pkg search openjdk` for a matching build.
+- **LWJGL version.** If `liblwjgl.so` fails to load again, the game bumped LWJGL. The version it wants shows up as `/tmp/lwjgl_root/<version>/` in the log; look for that version in a current Zomdroid APK.
+- **The `android/` folder itself.** This whole approach depends on The Indie Stone continuing to ship it. If a future build drops it, keep a copy of the working `.so` files — they may still load, or they may not.
+
+Back up `~/Zomboid` before updating:
+
+```bash
+tar -czf ~/zomboid-backup.tar.gz ~/Zomboid
+```
 
 ---
 
@@ -253,10 +359,10 @@ All three collide with the same constraint: Android's kernel gives 39 bits of ad
 
 ## Related projects
 
+- [Zomdroid](https://github.com/udarmolota/zomdroid) — Project Zomboid client on Android. Source of the ARM LWJGL build used here, and where the `android/` natives folder first came to light. Fork of [liamelui/zomdroid](https://github.com/liamelui/zomdroid), which is archived.
 - [kaanzapkinus/ZomboidServer-arm](https://github.com/kaanzapkinus/ZomboidServer-arm) — box64 setup with a full control panel, mod management and auto-updates
-- [Dyarven/zomboid-server-on-arm](https://github.com/Dyarven/zomboid-server-on-arm) — the original ARM installer script
+- [Dyarven/zomboid-server-on-arm](https://github.com/Dyarven/zomboid-server-on-arm) — ARM installer script
 - [Steam thread on ARM64 server binaries](https://steamcommunity.com/app/108600/discussions/1/3415433168012191380/) — years of community attempts
-- [Zomdroid](https://github.com/udarmolota/zomdroid) — PZ client on Android, and the source of the ARM LWJGL build
 
 ---
 
