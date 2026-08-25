@@ -1,6 +1,6 @@
 # zomboid-server-native-arm64
 
-Run a **Project Zomboid Build 42 dedicated server natively on ARM64**, no box64, no FEX, no QEMU.
+Run a **Project Zomboid Build 42 dedicated server natively on ARM64** — no box64, no FEX, no QEMU.
 
 Tested on a **Poco X3 Pro** (Snapdragon 860, 8 GB RAM) running Termux on Android 12, hosting **PZ 42.20.3**.
 
@@ -59,20 +59,56 @@ No root. No proot. No Docker.
 
 ## Quick start
 
+**0. Set up SSH** — skip if you already have it, or if you don't mind typing on the phone.
+
+Everything below is easier from a computer. In Termux:
+
+```bash
+pkg install openssh -y
+passwd          # set a password
+whoami          # note the username, e.g. u0_a309
+sshd            # start the server, listens on port 8022
+```
+
+Get the phone's LAN IP from Android settings (Wi-Fi → your network), then from your computer:
+
+```bash
+ssh -p 8022 u0_a309@192.168.1.x
+```
+
+Port 8022, not 22 — Termux can't bind privileged ports without root.
+
+`sshd` doesn't survive a reboot on its own. To start it automatically, install the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) addon from the same source as Termux, then create a startup script:
+
+```bash
+mkdir -p ~/.termux/boot
+nano ~/.termux/boot/start-sshd
+```
+
+Put this in the file:
+
+```sh
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+sshd
+```
+
+Save with `Ctrl+O`, `Enter`, then `Ctrl+X`. Make it executable:
+
+```bash
+chmod +x ~/.termux/boot/start-sshd
+```
+
 **1. Install.** Inside Termux:
 
 ```bash
-pkg install git -y
-git clone https://github.com/nikiiiii-ii/zomboid-server-native-arm64
-cd zomboid-server-native-arm64
-bash install.sh
+pkg install git -y && git clone https://github.com/nikiiiii-ii/zomboid-server-native-arm64 && cd zomboid-server-native-arm64 && bash install.sh
 ```
 
 Or without git:
 
 ```bash
-curl -Lo install.sh https://raw.githubusercontent.com/nikiiiii-ii/zomboid-server-native-arm64/main/install.sh
-bash install.sh
+curl -Lo install.sh https://raw.githubusercontent.com/nikiiiii-ii/zomboid-server-native-arm64/main/install.sh && bash install.sh
 ```
 
 The script asks for your Steam username early on — that's only to fetch the ~95 MB `android/` folder, and Steam Guard will prompt on your phone. Everything after that is unattended, including the ~7 GB server download.
@@ -174,51 +210,20 @@ dotnet ~/dd/DepotDownloader.dll -app 380870 -os linux -osarch 64 -dir ~/pzserver
 ### 6. Launch
 
 ```bash
-cd ~/pzserver && java \
-  -Djava.awt.headless=true \
-  -Xmx3g \
-  -Dzomboid.steam=0 \
-  -Djava.library.path=$HOME/pzserver/arm64 \
-  -Dorg.lwjgl.librarypath=$HOME/pzserver/arm64 \
-  -XX:+UseSerialGC \
-  -cp "java/:java/projectzomboid.jar" \
-  zombie.network.GameServer -nosteam
+cd ~/pzserver && java -Djava.awt.headless=true -Xmx3g -Dzomboid.steam=0 -Djava.library.path=$HOME/pzserver/arm64 -Dorg.lwjgl.librarypath=$HOME/pzserver/arm64 -XX:+UseSerialGC -cp "java/:java/projectzomboid.jar" zombie.network.GameServer -nosteam
 ```
+
+What each flag does:
+
+| Flag | Why |
+| --- | --- |
+| `-Djava.library.path=.../arm64` | Where the ARM natives live. Without this it looks in `linux64/`, which holds the x86 ones. |
+| `-Dorg.lwjgl.librarypath=.../arm64` | Stops LWJGL from unpacking its bundled x86 build to `/tmp`. |
+| `-Dzomboid.steam=0` + `-nosteam` | Skips `steamclient.so`, which has no ARM build. |
+| `-XX:+UseSerialGC` | Lighter than G1 on a phone; also what the emulated setups end up needing. |
+| `-Xmx3g` | Heap ceiling. Raise or lower to fit your RAM. |
 
 Note what's absent: no `box64`, no `BOX64_DYNAREC_*` tuning, no `-Xint`, no `LD_PRELOAD`. Plain `java`.
-
----
-
-## Managing it from a computer
-
-Typing commands on a phone keyboard gets old fast. Termux can run an SSH server:
-
-```bash
-pkg install openssh -y
-passwd          # set a password
-whoami          # note the username, e.g. u0_a309
-sshd            # start the server, listens on port 8022
-```
-
-Get the phone's LAN IP from Android settings (Wi-Fi → your network). Then from your computer:
-
-```bash
-ssh -p 8022 u0_a309@192.168.1.x
-```
-
-Port 8022, not 22 — Termux can't bind privileged ports without root.
-
-`sshd` doesn't survive a reboot on its own. The [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) addon can start it automatically; install it from the same source as Termux, then:
-
-```bash
-mkdir -p ~/.termux/boot
-cat > ~/.termux/boot/start-sshd <<'EOF'
-#!/data/data/com.termux/files/usr/bin/sh
-termux-wake-lock
-sshd
-EOF
-chmod +x ~/.termux/boot/start-sshd
-```
 
 ---
 
