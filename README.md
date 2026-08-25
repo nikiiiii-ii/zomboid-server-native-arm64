@@ -328,15 +328,23 @@ chmod +x playit
 
 It prints a claim URL. Open it in a browser, sign in, and create a tunnel of type **Project Zomboid** pointing at `127.0.0.1:16261`. You get an address like `something.tun.ply.gg:2914` to hand out.
 
-To keep it running alongside the server:
+To keep it running alongside the server, exit Debian and create a launcher in Termux:
 
 ```bash
-cat > ~/start-playit.sh <<'EOF'
+nano ~/start-playit.sh
+```
+
+Put this in the file:
+
+```sh
 #!/data/data/com.termux/files/usr/bin/bash
 proot-distro login debian -- /root/playit
-EOF
-chmod +x ~/start-playit.sh
-tmux new -d -s playit ~/start-playit.sh
+```
+
+Save with `Ctrl+O`, `Enter`, then `Ctrl+X`. Then:
+
+```bash
+chmod +x ~/start-playit.sh && tmux new -d -s playit ~/start-playit.sh
 ```
 
 Newer agent versions (1.x) split the daemon from a GUI frontend and can't be claimed from a terminal, which is why this pins 0.15.26.
