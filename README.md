@@ -120,7 +120,9 @@ chmod +x ~/.termux/boot/start-sshd
 
 </details>
 
-### Step 1. Install
+### ⬇️ Step 1. Install
+
+**This is the command that does everything.** Paste it into Termux:
 
 ```bash
 pkg install git -y && git clone https://github.com/nikiiiii-ii/zomboid-server-native-arm64 && cd zomboid-server-native-arm64 && bash install.sh
