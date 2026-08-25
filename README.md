@@ -1,6 +1,6 @@
 # zomboid-server-native-arm64
 
-Run a **Project Zomboid Build 42 dedicated server natively on ARM64** — no box64, no FEX, no QEMU.
+Run a **Project Zomboid Build 42 dedicated server natively on ARM64**  no box64, no FEX, no QEMU.
 
 Tested on a **Poco X3 Pro** (Snapdragon 860, 8 GB RAM) running Termux on Android 12, hosting **PZ 42.20.3**.
 
