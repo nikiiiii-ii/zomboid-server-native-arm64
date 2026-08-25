@@ -22,6 +22,12 @@ say()  { printf '\n\033[1;32m==>\033[0m %s\n' "$1"; }
 warn() { printf '\n\033[1;33m!!\033[0m %s\n' "$1"; }
 die()  { printf '\n\033[1;31mxx\033[0m %s\n' "$1" >&2; exit 1; }
 
+# Discard anything typed while a long task was running, so a stray Enter
+# doesn't get consumed as the answer to the next prompt.
+flush_input() {
+  while read -r -t 0.1 -n 10000 _ < /dev/tty; do :; done 2>/dev/null || true
+}
+
 # --- sanity checks ------------------------------------------------------
 
 [ "$(uname -m)" = "aarch64" ] || die "This script is for ARM64 devices. Detected: $(uname -m)"
@@ -60,26 +66,24 @@ if [ ! -f "$DD_DIR/DepotDownloader.dll" ]; then
 fi
 dotnet "$DD_DIR/DepotDownloader.dll" --version
 
-# --- server files -------------------------------------------------------
-
-if [ ! -f "$PZ_DIR/java/projectzomboid.jar" ]; then
-  say "Downloading server files (~7 GB, anonymous login)"
-  dotnet "$DD_DIR/DepotDownloader.dll" -app 380870 -os linux -osarch 64 -dir "$PZ_DIR"
-else
-  say "Server files already present, skipping"
-fi
-
 # --- ARM natives from the game depot ------------------------------------
 # The game ships ARM64 builds of its native libraries at
 # projectzomboid/natives/android/arm64-v8a/ — but only in the GAME depot
 # (app 108600), not the dedicated server depot. Requires owning the game.
+#
+# Done before the 7 GB download so the login prompt isn't buried under it.
 
 if [ ! -f "$NATIVES_DIR/libRakNet64.so" ]; then
-  say "ARM64 natives needed — this step requires your Steam account"
+  say "ARM64 natives — this step needs your Steam account"
   echo "    Only ~95 MB is downloaded (the android/ folder)."
-  printf '    Steam username: '
-  read -r STEAM_USER
-  [ -n "$STEAM_USER" ] || die "No username given."
+  echo "    Steam Guard will prompt on your phone or email."
+
+  flush_input
+  STEAM_USER=""
+  while [ -z "$STEAM_USER" ]; do
+    printf '    Steam username: '
+    read -r STEAM_USER < /dev/tty
+  done
 
   echo "regex:.*android.*" > "$HOME/.pz-filter.txt"
   dotnet "$DD_DIR/DepotDownloader.dll" -app 108600 -os linux -osarch 64 \
@@ -88,7 +92,8 @@ if [ ! -f "$NATIVES_DIR/libRakNet64.so" ]; then
   SRC="$GAME_DIR/projectzomboid/natives/android/arm64-v8a"
   [ -d "$SRC" ] || die "android/arm64-v8a not found. The game build may have changed."
   mkdir -p "$NATIVES_DIR"
-  cp -r "$SRC"/*.so "$NATIVES_DIR/"
+  cp "$SRC"/*.so "$NATIVES_DIR/"
+  rm -f "$HOME/.pz-filter.txt"
 else
   say "ARM64 natives already present, skipping"
 fi
@@ -96,10 +101,10 @@ fi
 # --- LWJGL --------------------------------------------------------------
 # The server initialises its gamepad subsystem at boot, which loads LWJGL.
 # The jar only bundles x86_64 natives; LWJGL's own linux-arm64 build is
-# glibc. Zomdroid ships a bionic-compatible build.
+# glibc. Zomdroid ships a bionic-compatible build — credit to that project.
 
 if [ ! -f "$NATIVES_DIR/liblwjgl.so" ]; then
-  say "Extracting ARM LWJGL $LWJGL_VERSION from Zomdroid"
+  say "Extracting ARM LWJGL $LWJGL_VERSION from the Zomdroid APK"
   cd "$HOME"
   curl -Lo zomdroid.apk "$ZOMDROID_URL"
   unzip -q -o zomdroid.apk "assets/bundles/libs.tar.xz" -d "$HOME/zomdroid-extract"
@@ -108,7 +113,7 @@ if [ ! -f "$NATIVES_DIR/liblwjgl.so" ]; then
 
   LW="android-arm64-v8a/lwjgl-$LWJGL_VERSION"
   if [ ! -d "$LW" ]; then
-    warn "lwjgl-$LWJGL_VERSION not in this APK. Available:"
+    warn "lwjgl-$LWJGL_VERSION is not in this APK. Available:"
     ls -d android-arm64-v8a/lwjgl-* 2>/dev/null || true
     die "Set LWJGL_VERSION at the top of this script to match your game build."
   fi
@@ -121,10 +126,20 @@ fi
 say "Native libraries in place:"
 ls -1 "$NATIVES_DIR"
 
+# --- server files -------------------------------------------------------
+
+if [ ! -f "$PZ_DIR/java/projectzomboid.jar" ]; then
+  say "Downloading server files — about 7 GB, this takes a while"
+  echo "    Anonymous login, no account needed for this part."
+  dotnet "$DD_DIR/DepotDownloader.dll" -app 380870 -os linux -osarch 64 -dir "$PZ_DIR"
+else
+  say "Server files already present, skipping"
+fi
+
 # --- launcher -----------------------------------------------------------
 
 say "Writing launcher to $HOME/start-pz.sh"
-cat > "$HOME/start-pz.sh" <<EOF
+cat > "$HOME/start-pz.sh" <<LAUNCHER
 #!/data/data/com.termux/files/usr/bin/bash
 cd "$PZ_DIR"
 exec java \\
@@ -136,13 +151,13 @@ exec java \\
   -XX:+UseSerialGC \\
   -cp "java/:java/projectzomboid.jar" \\
   zombie.network.GameServer -nosteam
-EOF
+LAUNCHER
 chmod +x "$HOME/start-pz.sh"
 
 # --- done ---------------------------------------------------------------
 
 say "Done."
-cat <<'EOF'
+cat <<'NOTES'
 
 First run — do this in the foreground so you can set the admin password:
 
@@ -162,4 +177,4 @@ Check on it without attaching:
 Players connect to your LAN IP on UDP 16261 and need -nosteam in their
 Steam launch options. For access outside your network, see the README.
 
-EOF
+NOTES
