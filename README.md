@@ -49,7 +49,7 @@ The emulated run reached `SERVER STARTED` but was unplayable — hundreds of `ch
 ## Requirements
 
 - ARM64 Android device, **6 GB RAM minimum** (8 GB comfortable)
-- ~10 GB free storage
+- 10 GB free storage
 - [Termux](https://f-droid.org/packages/com.termux/) from **F-Droid or GitHub** — the Play Store build is abandoned and broken
 - A Steam account that **owns Project Zomboid** (for the ARM natives; the server files themselves download anonymously)
 
